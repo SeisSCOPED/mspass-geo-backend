@@ -82,7 +82,7 @@ def wrap_lon_to_query_range(lon_in_db, query_min, query_max):
         result = shift_longitude_preserve_decimal(result, -360)
     return result
 
-def get_coordinates(collection):
+def get_coordinates(collection, collection_name):
     try:
         data = request.get_json()
         lon_range = tuple(data['lon_range'])  # Possibly out of [-180, 180]
@@ -98,18 +98,23 @@ def get_coordinates(collection):
             lon_db = doc['lon']
             lat_db = doc['lat']
 
+            # Optionally include magnitude if it's an earthquake collection
+            extra_fields = {}
+            if collection_name == 'earthquake' and 'magnitude' in doc:
+                extra_fields['magnitude'] = doc['magnitude']
+
             # Original coordinates: project into user's longitude range
             lon_original = wrap_lon_to_query_range(lon_db, lon_range[0], lon_range[1])
-            original_coords.append((lon_original, lat_db))
+            original_coords.append({'lon': lon_original, 'lat': lat_db, **extra_fields})
 
             # Normalized coordinates: wrap to [-180, 180]
-            normalized_coords.append((normalize_longitude(lon_db), lat_db))
+            normalized_coords.append({'lon': normalize_longitude(lon_db), 'lat': lat_db, **extra_fields})
 
             # All copies: lon - 360, lon, lon + 360
             all_coords.extend([
-                (shift_longitude_preserve_decimal(lon_db, -360), lat_db),
-                (lon_db, lat_db),  # already in DB precision
-                (shift_longitude_preserve_decimal(lon_db, 360), lat_db)
+                {'lon': shift_longitude_preserve_decimal(lon_db, -360), 'lat': lat_db, **extra_fields},
+                {'lon': lon_db, 'lat': lat_db, **extra_fields}, # already in DB precision
+                {'lon': shift_longitude_preserve_decimal(lon_db, 360), 'lat': lat_db, **extra_fields}
             ])
 
         response = jsonify({
@@ -125,11 +130,11 @@ def get_coordinates(collection):
 
 @app.route('/api/earthquakes/', methods=['POST'])
 def get_earthquake_coordinates():
-    return get_coordinates(earthquake_collection)
+    return get_coordinates(earthquake_collection, 'earthquakes')
 
 @app.route('/api/stations/', methods=['POST'])
 def get_station_coordinates():
-    return get_coordinates(station_collection)
+    return get_coordinates(station_collection, 'stations')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5050)
