@@ -12,6 +12,7 @@ mongo_uri = f"mongodb://mspasspod:{MONGO_PASSWORD}@mspasspod.pods.tacc.tapis.io:
 dbclient = MongoClient(mongo_uri)
 db = dbclient.get_database('scoped2024')
 earthquake_collection = db['source']
+station_collection = db['source'] # TODO
 
 def shift_longitude_preserve_decimal(lon, shift):
     """
@@ -81,14 +82,13 @@ def wrap_lon_to_query_range(lon_in_db, query_min, query_max):
         result = shift_longitude_preserve_decimal(result, -360)
     return result
 
-@app.route('/api/earthquakes/', methods=['POST'])
-def get_earthquake_coordinates():
+def get_coordinates(collection):
     try:
         data = request.get_json()
         lon_range = tuple(data['lon_range'])  # Possibly out of [-180, 180]
         lat_range = tuple(data['lat_range'])
 
-        docs = wrap_longitude_query(lon_range[0], lon_range[1], lat_range, earthquake_collection)
+        docs = wrap_longitude_query(lon_range[0], lon_range[1], lat_range, collection)
 
         original_coords = []
         normalized_coords = []
@@ -122,6 +122,14 @@ def get_earthquake_coordinates():
     except Exception as e:
         response = jsonify({'error': str(e)})
         return response, 400
+
+@app.route('/api/earthquakes/', methods=['POST'])
+def get_earthquake_coordinates():
+    return get_coordinates(earthquake_collection)
+
+@app.route('/api/stations/', methods=['POST'])
+def get_station_coordinates():
+    return get_coordinates(station_collection)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5050)
