@@ -11,7 +11,7 @@ MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
 mongo_uri = f"mongodb://mspasspod:{MONGO_PASSWORD}@mspasspod.pods.tacc.tapis.io:443/?ssl=true"
 dbclient = MongoClient(mongo_uri)
 db = dbclient.get_database('scoped2024')
-collection = db['source']
+earthquake_collection = db['source']
 
 def shift_longitude_preserve_decimal(lon, shift):
     """
@@ -81,14 +81,14 @@ def wrap_lon_to_query_range(lon_in_db, query_min, query_max):
         result = shift_longitude_preserve_decimal(result, -360)
     return result
 
-@app.route('/api/coordinates/', methods=['POST'])
-def get_coordinates():
+@app.route('/api/earthquakes/', methods=['POST'])
+def get_earthquake_coordinates():
     try:
         data = request.get_json()
         lon_range = tuple(data['lon_range'])  # Possibly out of [-180, 180]
         lat_range = tuple(data['lat_range'])
 
-        docs = wrap_longitude_query(lon_range[0], lon_range[1], lat_range, collection)
+        docs = wrap_longitude_query(lon_range[0], lon_range[1], lat_range, earthquake_collection)
 
         original_coords = []
         normalized_coords = []
