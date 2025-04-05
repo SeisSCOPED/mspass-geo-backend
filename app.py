@@ -100,7 +100,7 @@ def get_coordinates(collection, collection_name):
 
             # Optionally include magnitude if it's an earthquake collection
             extra_fields = {}
-            if collection_name == 'earthquake' and 'magnitude' in doc:
+            if collection_name == 'earthquakes' and 'magnitude' in doc:
                 extra_fields['magnitude'] = doc['magnitude']
 
             # Original coordinates: project into user's longitude range
