@@ -10,9 +10,10 @@ CORS(app)
 MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
 mongo_uri = f"mongodb://mspasspod:{MONGO_PASSWORD}@mspasspod.pods.tacc.tapis.io:443/?ssl=true"
 dbclient = MongoClient(mongo_uri)
-db = dbclient.get_database('scoped2024')
+# db = dbclient.get_database('scoped2024')
+db = dbclient.get_database('mspass')
 earthquake_collection = db['source']
-station_collection = db['source'] # TODO
+station_collection = db['site']
 
 def shift_longitude_preserve_decimal(lon, shift):
     """
