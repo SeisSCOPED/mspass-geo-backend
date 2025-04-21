@@ -249,19 +249,22 @@ def generate_and_send_station_notebook():
         )
 
         if response.status_code in [200, 201]:
-            return jsonify({
+            response = jsonify({
                 'message': f'Notebook {notebook_name} uploaded successfully.',
                 'filename': notebook_name
             })
+            return response
         else:
-            return jsonify({
+            response = jsonify({
                 'error': 'Failed to upload notebook',
                 'status_code': response.status_code,
                 'details': response.text
-            }), 500
+            })
+            return response, 500
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        response = jsonify({'error': str(e)})
+        return response, 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5050)
