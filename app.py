@@ -2,6 +2,9 @@ import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
+import requests
+import json
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 CORS(app)
@@ -129,6 +132,87 @@ def get_coordinates(collection, collection_name):
         response = jsonify({'error': str(e)})
         return response, 400
 
+def generate_station_notebook_json(station_id):
+    cells = [
+        # Cell 1: Install pymongo
+        "!pip install pymongo",
+
+        # Cell 2: Imports
+        "from pymongo import MongoClient",
+
+        # Cell 3: Username & Password
+        "\n".join([
+            '# TODO: Replace with your actual username & password',
+            'USERNAME = "username"',
+            'PASSWORD = "password"'
+        ]),
+
+        # Cell 4: URI
+        "\n".join([
+            '# TODO: Replace with your actual MongoDB URI',
+            'uri = f"mongodb://{USERNAME}:{PASSWORD}@localhost:27017/"'
+        ]),
+
+        # Cell 5: Connect to database
+        "\n".join([
+            'dbclient = MongoClient(uri)',
+            'db = dbclient.get_database("earthscope")'
+        ]),
+
+        # Cell 6: Set station ID
+        f'station_id = "{station_id}"',
+
+        # Cell 7: Count documents & find one
+        "\n".join([
+            'total = db.picks.count_documents({"tid": station_id})',
+            'first = db.picks.find_one({"tid": station_id})',
+            'print("Total picks:", total)',
+            'if first:',
+            '    print("First pick (via find_one):", first)',
+            'else:',
+            '    print("No picks found.")'
+        ]),
+
+        # Cell 8: List all picks and access first element (may be slow if large)
+        "\n".join([
+            '# CAUTION: This loads all picks into memory. Use with caution on large datasets.',
+            'picks = list(db.picks.find({"tid": station_id}))',
+            'print("Total picks:", len(picks))',
+            'if picks:',
+            '    print("First pick (via list):", picks[0])',
+            'else:',
+            '    print("No picks found.")'
+        ])
+    ]
+
+    notebook = {
+        "cells": [
+            {
+                "cell_type": "code",
+                "metadata": {},
+                "source": cell.strip().splitlines(keepends=True),
+                "outputs": [],
+                "execution_count": None
+            }
+            for cell in cells
+        ],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3"
+            },
+            "language_info": {
+                "name": "python",
+                "version": "3.x"
+            }
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+
+    return notebook
+
 @app.route('/api/earthquakes/', methods=['POST'])
 def get_earthquake_coordinates():
     return get_coordinates(earthquake_collection, 'earthquakes')
@@ -136,6 +220,48 @@ def get_earthquake_coordinates():
 @app.route('/api/stations/', methods=['POST'])
 def get_station_coordinates():
     return get_coordinates(station_collection, 'stations')
+
+@app.route('/api/generate-station-notebook/', methods=['POST'])
+def generate_and_send_station_notebook():
+    data = request.get_json()
+    station_id = data.get('station_id')
+    notebook_server_url = data.get('notebook_server_url')
+
+    if not station_id or not notebook_server_url:
+        return jsonify({'error': 'Missing station_id or notebook_server_url'}), 400
+
+    notebook_data = generate_station_notebook_json(station_id)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    notebook_name = f"/pods-jupyter/scoped/file{timestamp}.ipynb"
+
+    try:
+        # Upload notebook via Jupyter's REST API (PUT method for Contents API)
+        response = requests.put(
+            f"{notebook_server_url}/api/contents/{notebook_name}",
+            headers = {
+                "Content-Type": "application/json"
+            },
+            data = json.dumps({
+                "type": "notebook",
+                "format": "json",
+                "content": notebook_data
+            })
+        )
+
+        if response.status_code in [200, 201]:
+            return jsonify({
+                'message': f'Notebook {notebook_name} uploaded successfully.',
+                'filename': notebook_name
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to upload notebook',
+                'status_code': response.status_code,
+                'details': response.text
+            }), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5050)
