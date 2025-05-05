@@ -2,6 +2,8 @@
 
 This repository contains a Flask-based API service for interacting with MongoDB earthquake and station data, as well as generating and uploading Jupyter notebooks for station analysis.
 
+Docker image for this repository: yiw008/mspass-geo-backend
+
 ## Features
 
 - Query earthquake and station coordinates from MongoDB
