@@ -85,7 +85,7 @@ To run locally:
 Alternatively, build and run the Docker container:
 
 1. Build the Docker image using `docker build --platform=linux/amd64 -t yourDockerUsername/mspass-geo-backend .`.
-2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword --env DEFAULT_NOTEBOOK_SERVER_URL=yourServerURL --env DEFAULT_NOTEBOOK_TOKEN=yourToken mspass-geo-backend`.
+2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword --env DEFAULT_NOTEBOOK_SERVER_URL=yourServerURL --env DEFAULT_NOTEBOOK_TOKEN=yourToken yourDockerUsername/mspass-geo-backend`.
 
 The app will be available at http://localhost:5050.
 
