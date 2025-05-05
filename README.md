@@ -98,6 +98,7 @@ On native amd64 systems (like most Intel/AMD machines), you can omit the `--plat
 ## Notes
 
 - The notebook generation uploads using Jupyter’s REST API, so the server must be accessible and token-authenticated.
+- Avoid setting DEFAULT_NOTEBOOK_SERVER_URL to localhost or 127.0.0.1 when using Docker. Inside a Docker container, localhost refers only to the container itself — not the host machine and not other containers.
 
 ## License
 
