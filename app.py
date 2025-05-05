@@ -11,6 +11,8 @@ CORS(app)
 
 # MongoDB connection
 MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
+DEFAULT_NOTEBOOK_SERVER_URL = os.getenv("DEFAULT_NOTEBOOK_SERVER_URL") # Only for local testing
+DEFAULT_NOTEBOOK_TOKEN = os.getenv("DEFAULT_NOTEBOOK_TOKEN") # Only for local testing
 mongo_uri = f"mongodb://mspasspod:{MONGO_PASSWORD}@mspasspod.pods.tacc.tapis.io:443/?ssl=true"
 dbclient = MongoClient(mongo_uri)
 # db = dbclient.get_database('scoped2024')
@@ -106,6 +108,14 @@ def get_coordinates(collection, collection_name):
             extra_fields = {}
             if collection_name == 'earthquakes' and 'magnitude' in doc:
                 extra_fields['magnitude'] = doc['magnitude']
+            if collection_name == 'stations':
+                if 'id' in doc:
+                    extra_fields['id'] = doc['id']
+                elif 'net' in doc and 'sta' in doc and 'loc' in doc:
+                    net = doc['net'] if doc['net'] is not None else ''
+                    sta = doc['sta'] if doc['sta'] is not None else ''
+                    loc = doc['loc'] if doc['loc'] is not None else ''
+                    extra_fields['id'] = f"{net}.{sta}.{loc}"
 
             # Original coordinates: project into user's longitude range
             lon_original = wrap_lon_to_query_range(lon_db, lon_range[0], lon_range[1])
@@ -225,27 +235,28 @@ def get_station_coordinates():
 def generate_and_send_station_notebook():
     data = request.get_json()
     station_id = data.get('station_id')
-    notebook_server_url = data.get('notebook_server_url')
+    notebook_server_url = data.get('notebook_server_url', DEFAULT_NOTEBOOK_SERVER_URL)
+    notebook_token = data.get('notebook_token', DEFAULT_NOTEBOOK_TOKEN)
 
-    if not station_id or not notebook_server_url:
-        return jsonify({'error': 'Missing station_id or notebook_server_url'}), 400
+    if not station_id or not notebook_server_url or not notebook_token:
+        return jsonify({'error': 'Missing station_id, notebook_server_url, or notebook_token'}), 400
 
     notebook_data = generate_station_notebook_json(station_id)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    notebook_name = f"/pods-jupyter/scoped/file{timestamp}.ipynb"
+    notebook_name = f"file-{timestamp}.ipynb"
 
     try:
         # Upload notebook via Jupyter's REST API (PUT method for Contents API)
         response = requests.put(
             f"{notebook_server_url}/api/contents/{notebook_name}",
             headers = {
-                "Content-Type": "application/json"
+                "Authorization": f"token {notebook_token}"
             },
-            data = json.dumps({
+            json={
                 "type": "notebook",
                 "format": "json",
                 "content": notebook_data
-            })
+            }
         )
 
         if response.status_code in [200, 201]:
@@ -267,4 +278,4 @@ def generate_and_send_station_notebook():
         return response, 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5050)
+    app.run(host='0.0.0.0', port=5050)
