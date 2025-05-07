@@ -7,7 +7,7 @@ This repository contains a Flask-based API service for interacting with MongoDB 
 - Query earthquake and station coordinates from MongoDB
 - Normalize and wrap longitude ranges across the -180/180 boundary
 - Generate prebuilt Jupyter notebooks for station data analysis
-- Upload notebooks to a Jupyter server via its REST API
+- Upload notebooks to a generated Jupyter server via its REST API
 - Dockerized for easy deployment
 
 ## Requirements
@@ -26,8 +26,6 @@ This repository contains a Flask-based API service for interacting with MongoDB 
 The following environment variables should be set:
 
 - **MONGO_PASSWORD**: Password for connecting to MongoDB.
-- **DEFAULT_NOTEBOOK_SERVER_URL** (optional): Default Jupyter server URL, used if not provided in requests.
-- **DEFAULT_NOTEBOOK_TOKEN** (optional): Default Jupyter API token, used if not provided in requests.
 
 ## Endpoints
 
@@ -65,14 +63,18 @@ Each coordinate object includes:
 
 ### POST /api/generate-station-notebook/
 
-Generates a Jupyter notebook for a given station and uploads it to a Jupyter server.  
-**Request body:** JSON with `station_id`, optionally `notebook_server_url` and `notebook_token`.
+Generates a Jupyter notebook for a given station, generates a Jupyter server if needed, and uploads the notebook to the server.
 
-**Response:**  
-The notebook content sent to the Jupyter server includes:
+**Request body:** JSON with `station_id`.
+
+The notebook content sent to the generated Jupyter server includes:
 - Code cells for installing `pymongo`, connecting to MongoDB, setting credentials
 - Example MongoDB queries for counting and retrieving picks associated with the station
 - A preformatted `.ipynb` notebook structure compatible with Jupyter
+
+**Response:**
+A JSON object containing:
+- `url`: The full URL to open the uploaded notebook in the Jupyter server.
 
 ## Running the App
 
@@ -85,7 +87,7 @@ To run locally:
 Alternatively, build and run the Docker container:
 
 1. Pull the Docker image using `docker pull --platform=linux/amd64 ghcr.io/seisscoped/mspass-geo-backend:latest`.
-2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword --env DEFAULT_NOTEBOOK_SERVER_URL=yourServerURL --env DEFAULT_NOTEBOOK_TOKEN=yourToken ghcr.io/seisscoped/mspass-geo-backend:latest`.
+2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword ghcr.io/seisscoped/mspass-geo-backend:latest`.
 
 The app will be available at http://localhost:5050.
 
@@ -98,7 +100,6 @@ On native amd64 systems (like most Intel/AMD machines), you can omit the `--plat
 ## Notes
 
 - The notebook generation uploads using Jupyter’s REST API, so the server must be accessible and token-authenticated.
-- Avoid setting DEFAULT_NOTEBOOK_SERVER_URL to localhost or 127.0.0.1 when using Docker. Inside a Docker container, localhost refers only to the container itself — not the host machine and not other containers.
 
 ## License
 
