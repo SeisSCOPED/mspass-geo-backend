@@ -233,20 +233,57 @@ def get_station_coordinates():
 def generate_and_send_station_notebook():
     data = request.get_json()
     station_id = data.get('station_id')
-    notebook_server_url = data.get('notebook_server_url')
+    jwt = request.headers.get('X-Tapis-Token')
 
-    if not station_id or not notebook_server_url:
-        return jsonify({'error': 'Missing station_id or notebook_server_url'}), 400
+    if not station_id:
+        return jsonify({'error': 'Missing station_id'}), 400
 
     notebook_data = generate_station_notebook_json(station_id)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     notebook_name = f"file-{timestamp}.ipynb"
+    notebook_server_url = ''
 
+    try:
+        # Generate Server URL
+        response = requests.get(
+            'https://scoped.tapis.io/v3/pods/jupyter/ensure',
+            headers = {
+                "X-Tapis-Token": jwt
+            }
+        )
+
+        if response.status_code in [200, 201]:
+            data = response.json()
+            if data.get("status") == "success":
+                notebook_server_url = data["result"]["url"]
+            else:
+                response = jsonify({
+                    'error': 'Failed to generate server URL',
+                    'status_code': response.status_code,
+                    'details': response.text
+                })
+                return response, 500
+        else:
+            response = jsonify({
+                'error': 'Failed to generate server URL',
+                'status_code': response.status_code,
+                'details': response.text
+            })
+            return response, 500
+
+    except Exception as e:
+        response = jsonify({'error': str(e)})
+        return response, 500
+    
     try:
         # Upload notebook via Jupyter's REST API (PUT method for Contents API)
         response = requests.put(
             f"{notebook_server_url}/api/contents/{notebook_name}",
-            json={
+            headers = {
+                "X-Tapis-Token": jwt,
+                "Content-Type": "application/json"
+            },
+            json = {
                 "type": "notebook",
                 "format": "json",
                 "content": notebook_data
@@ -256,7 +293,7 @@ def generate_and_send_station_notebook():
         if response.status_code in [200, 201]:
             response = jsonify({
                 'message': f'Notebook {notebook_name} uploaded successfully.',
-                'filename': notebook_name,
+                'url': f"{notebook_server_url}/notebooks/{notebook_name}",
             })
             return response
         else:
