@@ -5,6 +5,7 @@ from pymongo import MongoClient
 import requests
 import json
 from datetime import datetime, timezone
+from decimal import Decimal, getcontext, ROUND_HALF_UP
 
 app = Flask(__name__)
 CORS(app)
@@ -23,25 +24,24 @@ def shift_longitude_preserve_decimal(lon, shift):
     Shift longitude by an integer (e.g., ±360), preserving the original decimal precision.
     Example: lon = 170.3456, shift = -360 -> returns -189.6544
     """
-    int_part = int(lon)
-    dec_part = lon - int_part
-    shifted = int_part + shift + dec_part
-    # Preserve decimal digits from original
     lon_str = str(lon)
     if '.' in lon_str:
         decimal_places = len(lon_str.split('.')[1])
     else:
         decimal_places = 0
-    return round(shifted, decimal_places)
+
+    getcontext().prec = decimal_places + 5
+    dec_lon = Decimal(str(lon))
+    dec_shift = Decimal(str(shift))
+    result = dec_lon + dec_shift
+
+    quantize_format = Decimal('1.' + '0' * decimal_places) if decimal_places > 0 else Decimal('1')
+    return float(result.quantize(quantize_format, rounding=ROUND_HALF_UP))
 
 def normalize_longitude(lon):
     """Normalize longitude to [-180, 180], preserving exact decimal format."""
     if lon == 180 or lon == -180:
         return lon
-
-    int_part = int(lon)
-    dec_part = lon - int_part
-    result = ((int_part + 180) % 360) - 180 + dec_part
 
     # Preserve decimal places
     lon_str = str(lon)
@@ -50,7 +50,15 @@ def normalize_longitude(lon):
     else:
         decimal_places = 0
 
-    return round(result, decimal_places)
+    getcontext().prec = decimal_places + 5
+    dec_lon = Decimal(str(lon))
+    dec_360 = Decimal('360')
+    dec_180 = Decimal('180')
+
+    result = ((dec_lon + dec_180) % dec_360) - dec_180
+
+    quantize_format = Decimal('1.' + '0' * decimal_places) if decimal_places > 0 else Decimal('1')
+    return float(result.quantize(quantize_format, rounding=ROUND_HALF_UP))
 
 def wrap_longitude_query(min_lon, max_lon, lat_range, collection):
     min_lat, max_lat = lat_range
