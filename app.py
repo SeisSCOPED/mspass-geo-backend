@@ -11,8 +11,6 @@ CORS(app)
 
 # MongoDB connection
 MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
-DEFAULT_NOTEBOOK_SERVER_URL = os.getenv("DEFAULT_NOTEBOOK_SERVER_URL") # Only for local testing
-DEFAULT_NOTEBOOK_TOKEN = os.getenv("DEFAULT_NOTEBOOK_TOKEN") # Only for local testing
 mongo_uri = f"mongodb://mspasspod:{MONGO_PASSWORD}@mspasspod.pods.tacc.tapis.io:443/?ssl=true"
 dbclient = MongoClient(mongo_uri)
 # db = dbclient.get_database('scoped2024')
@@ -235,11 +233,10 @@ def get_station_coordinates():
 def generate_and_send_station_notebook():
     data = request.get_json()
     station_id = data.get('station_id')
-    notebook_server_url = data.get('notebook_server_url', DEFAULT_NOTEBOOK_SERVER_URL)
-    notebook_token = data.get('notebook_token', DEFAULT_NOTEBOOK_TOKEN)
+    notebook_server_url = data.get('notebook_server_url')
 
-    if not station_id or not notebook_server_url or not notebook_token:
-        return jsonify({'error': 'Missing station_id, notebook_server_url, or notebook_token'}), 400
+    if not station_id or not notebook_server_url:
+        return jsonify({'error': 'Missing station_id or notebook_server_url'}), 400
 
     notebook_data = generate_station_notebook_json(station_id)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
@@ -249,9 +246,6 @@ def generate_and_send_station_notebook():
         # Upload notebook via Jupyter's REST API (PUT method for Contents API)
         response = requests.put(
             f"{notebook_server_url}/api/contents/{notebook_name}",
-            headers = {
-                "Authorization": f"token {notebook_token}"
-            },
             json={
                 "type": "notebook",
                 "format": "json",
@@ -262,7 +256,7 @@ def generate_and_send_station_notebook():
         if response.status_code in [200, 201]:
             response = jsonify({
                 'message': f'Notebook {notebook_name} uploaded successfully.',
-                'filename': notebook_name
+                'filename': notebook_name,
             })
             return response
         else:
