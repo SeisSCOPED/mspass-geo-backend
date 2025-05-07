@@ -2,8 +2,6 @@
 
 This repository contains a Flask-based API service for interacting with MongoDB earthquake and station data, as well as generating and uploading Jupyter notebooks for station analysis.
 
-Docker image for this repository: yiw008/mspass-geo-backend
-
 ## Features
 
 - Query earthquake and station coordinates from MongoDB
@@ -86,8 +84,8 @@ To run locally:
 
 Alternatively, build and run the Docker container:
 
-1. Build the Docker image using `docker build --platform=linux/amd64 -t yourDockerUsername/mspass-geo-backend .`.
-2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword --env DEFAULT_NOTEBOOK_SERVER_URL=yourServerURL --env DEFAULT_NOTEBOOK_TOKEN=yourToken yourDockerUsername/mspass-geo-backend`.
+1. Pull the Docker image using `docker pull --platform=linux/amd64 ghcr.io/seisscoped/mspass-geo-backend:latest`.
+2. Run the container with `docker run --platform=linux/amd64 -p 5050:5050 --env MONGO_PASSWORD=yourPassword --env DEFAULT_NOTEBOOK_SERVER_URL=yourServerURL --env DEFAULT_NOTEBOOK_TOKEN=yourToken ghcr.io/seisscoped/mspass-geo-backend:latest`.
 
 The app will be available at http://localhost:5050.
 
