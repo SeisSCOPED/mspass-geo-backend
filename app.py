@@ -25,40 +25,132 @@ def shift_longitude_preserve_decimal(lon, shift):
     Example: lon = 170.3456, shift = -360 -> returns -189.6544
     """
     lon_str = str(lon)
+
     if '.' in lon_str:
-        decimal_places = len(lon_str.split('.')[1])
+        lon_int_str, lon_dec_str = lon_str.split('.')
     else:
-        decimal_places = 0
+        lon_int_str, lon_dec_str = lon_str, ''
+    decimal_places = len(lon_dec_str)
 
-    getcontext().prec = decimal_places + 5
-    dec_lon = Decimal(str(lon))
-    dec_shift = Decimal(str(shift))
-    result = dec_lon + dec_shift
+    shift_abs = abs(shift)
+    shift_sign = 1 if shift >= 0 else -1
+    shift_int_str = str(shift_abs)
+    shift_dec_str = '0' * decimal_places
 
-    quantize_format = Decimal('1.' + '0' * decimal_places) if decimal_places > 0 else Decimal('1')
-    return float(result.quantize(quantize_format, rounding=ROUND_HALF_UP))
+    max_int_len = max(len(lon_int_str), len(shift_int_str))
+    lon_int_str = lon_int_str.zfill(max_int_len)
+    shift_int_str = shift_int_str.zfill(max_int_len)
+
+    lon_full_str = lon_int_str + lon_dec_str
+    shift_full_str = shift_int_str + shift_dec_str
+
+    if shift_sign == 1:
+        result_digits = []
+        carry = 0
+        for i in reversed(range(len(lon_full_str))):
+            lon_digit = int(lon_full_str[i])
+            shift_digit = int(shift_full_str[i]) if i < len(shift_full_str) else 0
+            digit_sum = lon_digit + shift_digit + carry
+            carry = digit_sum // 10
+            result_digits.insert(0, str(digit_sum % 10))
+        if carry > 0:
+            result_digits.insert(0, str(carry))
+        is_result_negative = False
+    else:
+        if lon_full_str >= shift_full_str:
+            top_str = lon_full_str
+            bottom_str = shift_full_str
+            is_result_negative = False
+        else:
+            top_str = shift_full_str
+            bottom_str = lon_full_str
+            is_result_negative = True
+        bottom_str = bottom_str.rjust(len(top_str), '0')
+        result_digits = []
+        borrow = 0
+        for i in reversed(range(len(top_str))):
+            t_digit = int(top_str[i])
+            b_digit = int(bottom_str[i])
+            digit = t_digit - b_digit - borrow
+            if digit < 0:
+                digit += 10
+                borrow = 1
+            else:
+                borrow = 0
+            result_digits.insert(0, str(digit))
+
+    int_len = len(lon_int_str)
+    result_int_str = ''.join(result_digits[:int_len]).lstrip('0') or '0'
+    result_dec_str = ''.join(result_digits[int_len:])
+
+    if decimal_places > 0:
+        result = result_int_str + '.' + result_dec_str
+    else:
+        result = result_int_str
+
+    if is_result_negative:
+        result = '-' + result
+
+    return result
 
 def normalize_longitude(lon):
     """Normalize longitude to [-180, 180], preserving exact decimal format."""
     if lon == 180 or lon == -180:
         return lon
 
-    # Preserve decimal places
     lon_str = str(lon)
+
     if '.' in lon_str:
-        decimal_places = len(lon_str.split('.')[1])
+        lon_int_str, lon_dec_str = lon_str.split('.')
     else:
-        decimal_places = 0
+        lon_int_str, lon_dec_str = lon_str, ''
+    decimal_places = len(lon_dec_str)
 
-    getcontext().prec = decimal_places + 5
-    dec_lon = Decimal(str(lon))
-    dec_360 = Decimal('360')
-    dec_180 = Decimal('180')
+    is_negative = lon_int_str.startswith('-')
+    lon_int_str = lon_int_str.lstrip('-')
 
-    result = ((dec_lon + dec_180) % dec_360) - dec_180
+    def string_add(num_str1, num_str2):
+        max_len = max(len(num_str1), len(num_str2))
+        num_str1 = num_str1.zfill(max_len)
+        num_str2 = num_str2.zfill(max_len)
+        result = []
+        carry = 0
+        for i in reversed(range(max_len)):
+            d1 = int(num_str1[i])
+            d2 = int(num_str2[i])
+            digit_sum = d1 + d2 + carry
+            carry = digit_sum // 10
+            result.insert(0, str(digit_sum % 10))
+        if carry > 0:
+            result.insert(0, str(carry))
+        return ''.join(result)
 
-    quantize_format = Decimal('1.' + '0' * decimal_places) if decimal_places > 0 else Decimal('1')
-    return float(result.quantize(quantize_format, rounding=ROUND_HALF_UP))
+    if is_negative:
+        top_str = string_add('0', '180')
+        lon_plus_180 = string_add(top_str, lon_int_str)  # + abs(lon)
+    else:
+        lon_plus_180 = string_add(lon_int_str, '180')
+
+    def string_mod(num_str, divisor):
+        remainder = 0
+        for digit in num_str:
+            remainder = (remainder * 10 + int(digit)) % divisor
+        return remainder
+
+    remainder = string_mod(lon_plus_180, 360)
+
+    if remainder > 180:
+        normalized_int = remainder - 360
+    else:
+        normalized_int = remainder
+
+    result_int_str = str(normalized_int)
+    if decimal_places > 0:
+        result = result_int_str + '.' + lon_dec_str
+    else:
+        result = result_int_str
+
+    return result
 
 def wrap_longitude_query(min_lon, max_lon, lat_range, collection):
     min_lat, max_lat = lat_range
